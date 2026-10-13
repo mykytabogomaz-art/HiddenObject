@@ -1,1 +1,163 @@
 
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Таємничий предмет</title>
+<style>
+:root{--bg:#f4f1ff;--card:#fff;--ink:#2a2540;--muted:#6b6785;--accent:#6c4cf1;--ai:#ece8ff;--ok:#1f9d63;--bad:#c0392b;--line:#d9d3f5;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#17141f;--card:#221e2e;--ink:#f0edfa;--muted:#a9a4c0;--accent:#8f78ff;--ai:#2f2945;--ok:#4ad08f;--bad:#ff8a7a;--line:#3a3354}}
+:root[data-theme="dark"]{--bg:#17141f;--card:#221e2e;--ink:#f0edfa;--muted:#a9a4c0;--accent:#8f78ff;--ai:#2f2945;--ok:#4ad08f;--bad:#ff8a7a;--line:#3a3354}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--ink);font-family:"Nunito","Trebuchet MS",system-ui,sans-serif;font-size:17px}
+.app{max-width:640px;height:100%;margin:0 auto;display:flex;flex-direction:column;gap:10px;padding:12px}
+.top{background:var(--card);border:2px solid var(--line);border-radius:18px;padding:12px 16px}
+.top h1{margin:0 0 4px;font-size:20px}
+.top p{margin:0;color:var(--muted);line-height:1.4}
+.bar{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:8px;font-weight:700;font-size:15px}
+.dots span{display:inline-block;width:12px;height:12px;border-radius:50%;background:var(--line);margin-left:6px}
+.dots span.on{background:var(--accent)}
+.dots span.done{background:var(--ok)}
+#log{flex:1;overflow-y:auto;background:var(--card);border:2px solid var(--line);border-radius:18px;padding:14px;display:flex;flex-direction:column;gap:10px}
+.m{max-width:82%;padding:10px 14px;border-radius:16px;line-height:1.4;overflow-wrap:anywhere}
+.ai{background:var(--ai);align-self:flex-start;border-bottom-left-radius:4px}
+.me{background:var(--accent);color:#fff;align-self:flex-end;border-bottom-right-radius:4px}
+.win{background:var(--ok);color:#fff;align-self:center;text-align:center;font-weight:700}
+.row{display:flex;gap:8px}
+input{flex:1;min-width:0;font:inherit;padding:12px 14px;border-radius:14px;border:2px solid var(--line);background:var(--card);color:var(--ink)}
+input:focus{outline:none;border-color:var(--accent)}
+button{font:inherit;font-weight:700;border:0;border-radius:14px;padding:12px 18px;background:var(--accent);color:#fff;cursor:pointer}
+button:disabled{opacity:.5;cursor:default}
+button.ghost{background:transparent;color:var(--muted);border:2px solid var(--line);padding:6px 10px;font-size:13px}
+.cta{align-self:center;background:var(--ok)}
+#gate{position:fixed;inset:0;z-index:10;background:var(--bg);display:flex;align-items:center;justify-content:center;padding:20px}
+#gate[hidden]{display:none}
+#gate .box{width:100%;max-width:440px;background:var(--card);border:2px solid var(--line);border-radius:18px;padding:22px;display:flex;flex-direction:column;gap:12px}
+#gate h2{margin:0;font-size:22px}
+#gate p{margin:0;color:var(--muted);line-height:1.45;font-size:15px}
+#gate a{color:var(--accent);font-weight:700}
+#gate .err{color:var(--bad);font-weight:700;min-height:1.2em}
+</style>
+</head>
+<body>
+<div id="gate" hidden>
+  <div class="box">
+    <h2>🔑 Ключ API Claude</h2>
+    <p>Щоб ШІ міг відповідати, вставте свій ключ API. Його можна створити на <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">console.anthropic.com</a> (потрібен акаунт розробника з невеликим балансом).</p>
+    <p>Ключ запам'ятовується лише в цьому браузері на цьому пристрої й надсилається тільки до Anthropic. Не вводьте його на чужому комп'ютері.</p>
+    <input id="key" type="password" placeholder="sk-ant-…" autocomplete="off" spellcheck="false">
+    <div class="err" id="err"></div>
+    <button id="savekey">Зберегти й грати</button>
+  </div>
+</div>
+<div class="app">
+  <div class="top">
+    <h1>🔍 Таємничий предмет</h1>
+    <p>Я штучний інтелект, я загадав одне слово. Задавай мені питання, щоб вгадати слово!</p>
+    <div class="bar"><span id="lvl"></span><span class="dots" id="dots"></span><button class="ghost" id="forget">Змінити ключ</button></div>
+  </div>
+  <div id="log"></div>
+  <div class="row">
+    <input id="q" placeholder="Напиши своє питання…" maxlength="200" autocomplete="off">
+    <button id="send">Надіслати</button>
+  </div>
+</div>
+<script>
+const MODEL="claude-haiku-5-5";
+const KEY_NAME="mystery_game_api_key";
+const WORDS=["кіт","собака","яблуко","книга","стілець","машина","сонце","дерево","м'яч","будинок","риба","квітка","годинник","ложка","телефон","молоко","ліжко","птах","хліб","гора","зірка","вікно","олівець","ключ","парасолька","корова","торт","море","гітара","капелюх"];
+const LEVELS=3;
+let used=[],level=0,word="",hist=[],busy=false,over=false,apiKey="";
+const $=id=>document.getElementById(id);
+const log=$("log"),qi=$("q"),sendB=$("send");
+const norm=s=>s.toLowerCase().replace(/[’ʼ`]/g,"'");
+
+function loadKey(){try{return localStorage.getItem(KEY_NAME)||""}catch(e){return ""}}
+function saveKey(k){try{localStorage.setItem(KEY_NAME,k)}catch(e){}}
+function clearKey(){try{localStorage.removeItem(KEY_NAME)}catch(e){}}
+
+function add(cls,text){const d=document.createElement("div");d.className="m "+cls;d.textContent=text;log.appendChild(d);log.scrollTop=log.scrollHeight;return d}
+function setDots(){$("lvl").textContent="Рівень "+level+" з "+LEVELS;
+  $("dots").innerHTML=Array.from({length:LEVELS},(_,i)=>'<span class="'+(i+1<level||(i+1===level&&over)?"done":i+1===level?"on":"")+'"></span>').join("")}
+function pick(){const left=WORDS.filter(w=>!used.includes(w));word=left[Math.floor(Math.random()*left.length)];used.push(word)}
+function lock(v){qi.disabled=v;sendB.disabled=v}
+
+function showGate(msg){$("err").textContent=msg||"";$("key").value="";$("gate").hidden=false;lock(true);$("key").focus()}
+function hideGate(){$("gate").hidden=true;lock(over);if(!over)qi.focus()}
+
+function startLevel(){
+  level++;over=false;hist=[];log.innerHTML="";pick();setDots();lock(false);
+  add("ai","Привіт! Я загадав таємничий предмет. Став мені питання, а я відповім «так» або «ні». 🤫");
+  qi.focus();
+}
+function finishLevel(text){
+  over=true;lock(true);setDots();add("win",text);
+  const b=document.createElement("button");b.className="cta";
+  if(level<LEVELS){b.textContent="Наступний рівень ➜";b.onclick=startLevel}
+  else{add("win","🏆 Ти пройшов усі 3 рівні! Молодець!");b.textContent="Грати знову";b.onclick=()=>{used=[];level=0;startLevel()}}
+  log.appendChild(b);log.scrollTop=log.scrollHeight;
+}
+
+async function ask(){
+  const text=qi.value.trim();
+  if(!text||busy||over)return;
+  if(!apiKey){showGate();return}
+  qi.value="";add("me",text);busy=true;lock(true);
+  const typing=add("ai","…");
+  const system="Ти ведеш дитячу гру «Таємничий предмет». Загадане слово: «"+word+"». Дитина (6–10 років) ставить питання, щоб його вгадати. "+
+    "Правила: відповідай українською, дуже коротко й просто: «Так», «Ні» або «Інколи», максимум з одним коротким поясненням. "+
+    "НІКОЛИ не називай загаданого слова, його частин чи прямих синонімів. Якщо питання не стосується предмета — лагідно попроси поставити питання про предмет. "+
+    "Якщо дитина назвала саме це слово (у будь-якій формі) як відповідь — почни відповідь зі слова ПЕРЕМОГА.";
+  const messages=[];
+  hist.slice(-10).forEach(h=>{messages.push({role:"user",content:h[0]});messages.push({role:"assistant",content:h[1]})});
+  messages.push({role:"user",content:text});
+  try{
+    const res=await fetch("https://api.anthropic.com/v1/messages",{
+      method:"POST",
+      headers:{
+        "content-type":"application/json",
+        "x-api-key":apiKey,
+        "anthropic-version":"2023-06-01",
+        "anthropic-dangerous-direct-browser-access":"true"
+      },
+      body:JSON.stringify({model:MODEL,max_tokens:200,system:system,messages:messages})
+    });
+    if(res.status===401||res.status===403){
+      typing.remove();clearKey();apiKey="";busy=false;
+      showGate("Ключ не підійшов. Перевірте його й вставте ще раз.");return;
+    }
+    if(!res.ok)throw new Error("http "+res.status);
+    const data=await res.json();
+    let ans=(data.content||[]).map(i=>i.type==="text"?i.text:"").join("").trim();
+    if(!ans)throw new Error("empty");
+    typing.remove();
+    const won=/^перемога/i.test(ans)||norm(text).split(/[^а-яіїєґ']+/).includes(word);
+    if(won){finishLevel("🎉 Правильно! Загадане слово — «"+word+"»!")}
+    else{
+      if(norm(ans).includes(word))ans="Ой, я мало не проговорився! Спробуй інше питання. 🙊";
+      hist.push([text,ans]);add("ai",ans);
+    }
+  }catch(e){
+    typing.textContent="Ой, щось пішло не так (перевір інтернет і баланс ключа). Спробуй ще раз! 🙈";
+  }
+  busy=false;if(!over){lock(false);qi.focus()}
+}
+
+$("savekey").onclick=()=>{
+  const k=$("key").value.trim();
+  if(!/^sk-ant-/.test(k)){$("err").textContent="Ключ має починатися з sk-ant-";return}
+  apiKey=k;saveKey(k);hideGate();
+};
+$("key").addEventListener("keydown",e=>{if(e.key==="Enter")$("savekey").click()});
+$("forget").onclick=()=>{clearKey();apiKey="";showGate()};
+sendB.onclick=ask;
+qi.addEventListener("keydown",e=>{if(e.key==="Enter")ask()});
+
+startLevel();
+apiKey=loadKey();
+if(!apiKey)showGate();
+</script>
+</body>
+</html>
